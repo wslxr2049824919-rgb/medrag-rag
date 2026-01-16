@@ -1,0 +1,13 @@
+{
+  "processed_date":"2026-01-16T21:51:08.632945",
+  "data_split":"test",
+  "original_documents":2500,
+  "total_chunks":2500,
+  "chunks_per_doc":1.0,
+  "chunk_size":512,
+  "chunk_overlap":64,
+  "split_mode":"no_split",
+  "min_token_count":94,
+  "max_token_count":803,
+  "avg_token_count":313.982
+}

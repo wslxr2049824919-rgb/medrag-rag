@@ -1,0 +1,13 @@
+{
+  "processed_date":"2026-01-16T21:44:41.348893",
+  "data_split":"train",
+  "original_documents":15000,
+  "total_chunks":15000,
+  "chunks_per_doc":1.0,
+  "chunk_size":512,
+  "chunk_overlap":64,
+  "split_mode":"no_split",
+  "min_token_count":101,
+  "max_token_count":972,
+  "avg_token_count":314.3933333333
+}
