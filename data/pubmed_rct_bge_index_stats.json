@@ -1,0 +1,20 @@
+{
+  "collection_name": "pubmed_rct_bge",
+  "total_chunks": 15000,
+  "embedding_model": "BAAI/bge-small-en-v1.5",
+  "embedding_dimension": 384,
+  "index_built_at": "2026-01-23T13:36:16.226630",
+  "chunk_size_stats": {
+    "mean": 314.3933333333333,
+    "max": 972,
+    "min": 101
+  },
+  "metadata_fields": [
+    "doc_id",
+    "chunk_index",
+    "total_chunks",
+    "split",
+    "token_count",
+    "source_title"
+  ]
+}
