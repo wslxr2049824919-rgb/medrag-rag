@@ -14,3 +14,5 @@ chroma_medrag_mvp/
 
 # Jupyter 缓存
 .ipynb_checkpoints/
+chroma_medrag_bge/
+src/keyword_bm25.py.save

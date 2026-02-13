@@ -1,9 +1,9 @@
 """
 query_bge_index.py
 
-用于对已构建的 PubMed RCT BGE + Chroma 向量索引做简单质量验证：
-- 手动查询：输入英文医学问题，查看检索结果
-- 自检：随机抽取索引中的文本块作为查询，检查自相似性
+用于对已构建的 PubMed RCT BGE + Chroma 向量索引做质量验证和简单检索：
+- 自检：随机抽取索引中的文本块作为查询
+- 手动查询：输入英文医学问题或句子，经医学查询理解模块增强后进行向量检索
 """
 
 from pathlib import Path
@@ -13,6 +13,8 @@ from typing import List, Dict, Any
 
 from sentence_transformers import SentenceTransformer
 import chromadb
+
+from query_understanding import MedicalQueryProcessor, QueryAnalysisResult
 
 
 def load_bge_model(model_name: str = "BAAI/bge-small-en-v1.5") -> SentenceTransformer:
@@ -54,15 +56,17 @@ def embed_query(
 ) -> List[List[float]]:
     """
     将查询文本编码为向量，返回二维 list。
-    按 BGE 推荐，增加 query 前缀。
+
+    说明：
+        BGE 的指令前缀已经在 MedicalQueryProcessor 中构造，
+        这里直接对传入的文本做 encode 即可。
     """
     text = query_text.strip()
     if not text:
         raise ValueError("查询文本为空。")
 
-    prefixed = f"Represent this query for retrieval: {text}"
     embedding = model.encode(
-        [prefixed],
+        [text],
         normalize_embeddings=True,
         show_progress_bar=False,
     )
@@ -84,7 +88,7 @@ def run_query(
         print("[query] 查询文本为空，已跳过。")
         return
 
-    print(f"\n[query] 查询文本：{text}")
+    print(f"\n[query] 向量检索文本：{text}")
     query_embeddings = embed_query(text, model)
 
     results = collection.query(
@@ -134,7 +138,7 @@ def self_check(
 
     fetched = collection.get(
         limit=sample_limit,
-        include=[ "documents", "metadatas"],
+        include=["documents", "metadatas"],
     )
 
     docs = fetched.get("documents", [])
@@ -170,10 +174,10 @@ def self_check(
 
 def main() -> None:
     """
-    命令行入口：提供简单菜单进行质量验证。
+    命令行入口：提供简单菜单进行质量验证和增强后查询。
     """
     parser = argparse.ArgumentParser(
-        description="对 PubMed RCT BGE + Chroma 向量索引进行质量验证。"
+        description="对 PubMed RCT BGE + Chroma 向量索引进行检索与质量验证。"
     )
     parser.add_argument(
         "--persist_dir",
@@ -202,10 +206,13 @@ def main() -> None:
         collection_name=args.collection_name,
     )
 
+    # 初始化医学查询处理器
+    processor = MedicalQueryProcessor()
+
     while True:
         print("\n========== 查询菜单 ==========")
         print("1) 自检：随机抽取索引中文本作为查询")
-        print("2) 手动查询：输入英文医学问题或句子")
+        print("2) 手动查询：输入医学问题（英文，支持医学缩写与同义词扩展）")
         print("0) 退出")
         choice = input("请选择操作：").strip()
 
@@ -217,12 +224,35 @@ def main() -> None:
             )
         elif choice == "2":
             q = input(
-                "\n请输入英文查询文本（直接回车返回菜单）：\n> "
+                "\n请输入医学查询（建议英文，如 'short-term effects of metformin on mi': ）\n> "
             ).strip()
             if not q:
                 continue
+
+            # 1) 先做查询理解与增强
+            analysis: QueryAnalysisResult = processor.process(q)
+
+            print("\n[query-understanding] 查询分析结果：")
+            print(f"- raw      : {analysis.raw_query}")
+            print(f"- cleaned  : {analysis.cleaned_query}")
+            print(f"- entities : {analysis.entities}")
+            print(f"- expanded : {analysis.expanded_terms}")
+            print(f"- filters  : {analysis.filters}")
+            print("- vector_queries:")
+            for i, vq in enumerate(analysis.vector_queries, 1):
+                print(f"  [{i}] {vq}")
+
+            # 2) 选择一个向量检索用的文本
+            if analysis.vector_queries:
+                # 如果存在扩展版本，使用最后一个（通常为“带同义词提示”的版本）
+                vector_query_text = analysis.vector_queries[-1]
+            else:
+                # 兜底：使用 cleaned_query
+                vector_query_text = analysis.cleaned_query
+
+            # 3) 使用增强后的向量查询文本进行检索
             run_query(
-                query_text=q,
+                query_text=vector_query_text,
                 model=model,
                 collection=collection,
                 n_results=args.n_results,
